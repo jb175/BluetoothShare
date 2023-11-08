@@ -18,14 +18,16 @@ import androidx.core.app.ActivityCompat
 
 class MainActivity : AppCompatActivity() {
 
+    //static values to put an id on requests
     companion object {
-        private const val REQUEST_BLUETOOTH_CONNECT = 2
-        private const val REQUEST_BLUETOOTH_SCAN = 3
+        private const val REQUEST_BLUETOOTH_CONNECT = 1
+        private const val REQUEST_BLUETOOTH_SCAN = 2
     }
 
-    private val bluetoothReceiver = BluetoothReceiver(this)
+    //bluetooth adapter to perform actions with bluetooth
     private var bluetoothAdapter: BluetoothAdapter? = null
 
+    //register to enable bluetooth
     private val bluetoothEnableLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode != Activity.RESULT_OK) {
@@ -37,6 +39,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    //receiver to detect if the bluetooth has been disabled
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                val newState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.STATE_OFF)
+
+                if (newState == BluetoothAdapter.STATE_OFF) {
+                    Log.println(Log.INFO, "BluetoothService", "Bluetooth has been turned off ")
+                    checkBluetoothPermission()
+                }
+            }
+        }
+    }
+
+    //receiver to scan new devices with bluetooth
     private val discoveryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -54,11 +71,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        Log.println(Log.INFO, "MainActivity","setup register")
+        Log.println(Log.INFO, "MainActivity","setup bluetooth register")
         registerReceiver(bluetoothReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 
         Log.println(Log.INFO, "BluetoothService","get Adapter")
@@ -74,14 +92,21 @@ class MainActivity : AppCompatActivity() {
         checkBluetoothPermission()
     }
 
+    //stop receiver
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterReceiver(bluetoothReceiver)
+        unregisterReceiver(discoveryReceiver)
+    }
+
+    //execute actions when a permission is granted or not
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
-        Log.println(Log.INFO, "BluetoothService", "request id: $requestCode")
         when (requestCode) {
             REQUEST_BLUETOOTH_CONNECT -> {
                 if (grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                    Log.println(Log.WARN, "BluetoothService","bluetooth permission not allowed")
+                    Log.println(Log.WARN, "BluetoothService","bluetooth permission not granted. Couldn't connect to bluetooth device")
                     finish()
                 } else {
                     Log.println(Log.INFO, "BluetoothService","bluetooth permission granted")
@@ -90,7 +115,7 @@ class MainActivity : AppCompatActivity() {
             }
             REQUEST_BLUETOOTH_SCAN -> {
                 if (grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                    Log.println(Log.WARN, "BluetoothService","bluetooth permission not allowed")
+                    Log.println(Log.WARN, "BluetoothService","bluetooth permission not granted. Couldn't scan devices")
                     finish()
                 } else {
                     Log.println(Log.INFO, "BluetoothService","bluetooth permission granted")
@@ -100,7 +125,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
+    //check if the bluetooth connect permission is allowed
     fun checkBluetoothPermission() {
         if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             Log.println(Log.INFO, "BluetoothService","ask for bluetooth permission")
@@ -111,7 +136,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
+    //check if bluetooth is enable
     private fun enableBluetooth() {
         if (bluetoothAdapter?.isEnabled == false) {
             Log.println(Log.INFO, "BluetoothService","bluetooth not enable")
@@ -122,6 +147,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    //ask to enable bluetooth
     private fun requestEnableBluetooth() {
         val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -131,6 +157,7 @@ class MainActivity : AppCompatActivity() {
         bluetoothEnableLauncher.launch(enableBtIntent)
     }
 
+    //list all known devices
     private fun listPairedBluetoothDevices() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             finish()
@@ -149,6 +176,7 @@ class MainActivity : AppCompatActivity() {
         requestDiscoverability()
     }
 
+    //ask permission to scan new devices
     private fun requestDiscoverability() {
         if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
             Log.println(Log.INFO, "BluetoothService","ask for bluetooth scan permission")
@@ -159,6 +187,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    //scan new devices
     private fun discoverBluetoothDevices() {
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND)
         registerReceiver(discoveryReceiver, filter)
@@ -171,9 +200,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        unregisterReceiver(bluetoothReceiver)
-        unregisterReceiver(discoveryReceiver)
-    }
 }
