@@ -29,11 +29,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <receiver android:name=".BluetoothReceiver" android:exported="false">
-            <intent-filter>
-                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
-            </intent-filter>
-        </receiver>
+        <activity
+            android:name=".DiscoverActivity"/>
+        <activity
+            android:name=".ReceiveActivity"/>
+        <activity
+            android:name=".TransferActivity"/>
     </application>
 
 </manifest>
