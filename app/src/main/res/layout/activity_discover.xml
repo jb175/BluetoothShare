@@ -4,49 +4,32 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    tools:context=".DiscoverActivity">
 
     <TextView
         android:id="@+id/devicesScaned"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginStart="40dp"
         android:layout_marginTop="60dp"
-        android:text="Bluetooth Share"
-        android:textSize="30sp"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:text="Discover devices"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        android:textSize="30sp"  />
 
-    <LinearLayout
-        android:id="@+id/linearLayout"
+    <ListView
+        android:id="@+id/listDevicesScaned"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginStart="40dp"
         android:layout_marginTop="10dp"
         android:layout_marginEnd="40dp"
         android:layout_marginBottom="40dp"
-        android:gravity="center"
-        android:orientation="vertical"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/devicesScaned">
 
-        <Button
-            android:id="@+id/discoverActivityButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="100dp"
-            android:text="Scan devices" />
-
-        <Button
-            android:id="@+id/receiveActivityButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/discoverActivityButton"
-            android:layout_marginTop="20dp"
-            android:text="Accept connection" />
-
-    </LinearLayout>
+    </ListView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
