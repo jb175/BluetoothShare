@@ -1,8 +1,6 @@
 package fr.isep.bluetoothshare
 
 import android.Manifest
-import android.annotation.SuppressLint
-import android.app.Activity
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
@@ -20,22 +18,25 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import java.io.IOException
 import java.util.UUID
 
 
 class MyAdapter(context: Context, private val devices: List<BluetoothDevice>) : ArrayAdapter<BluetoothDevice>(context, R.layout.list_item, devices) {
     
-    @SuppressLint("MissingPermission")
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
         val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.list_item, parent, false)
 
         val device = devices[position]
         val textViewName = view.findViewById<TextView>(R.id.name)
         val textViewAddress = view.findViewById<TextView>(R.id.address)
+
+        val activity = context as DiscoverActivity
+        if (ActivityCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            Log.println(Log.WARN, "BluetoothService", "bluetooth permission not allowed")
+            activity.finish()
+        }
 
         val address = device.address
         var name = device.name
@@ -50,11 +51,10 @@ class MyAdapter(context: Context, private val devices: List<BluetoothDevice>) : 
     }
 }
 
-class DiscoverActivity : AppCompatActivity() {
+class DiscoverActivity : AppCompatActivity()  {
 
     //static values to put an id on requests
     companion object {
-        private const val REQUEST_BLUETOOTH_CONNECT = 1
         private const val REQUEST_BLUETOOTH_SCAN = 2
         private val MY_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     }
@@ -65,19 +65,6 @@ class DiscoverActivity : AppCompatActivity() {
     private val alreadyPairedBluetoothDevices = ArrayList<BluetoothDevice>()
     private val bluetoothDevices = ArrayList<BluetoothDevice>()
 
-
-    //register to enable bluetooth
-    private val bluetoothEnableLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode != Activity.RESULT_OK) {
-            Log.println(Log.WARN, "BluetoothService", "Bluetooth has not or could not be enabled")
-            finish()
-        } else {
-            Log.println(Log.INFO, "BluetoothService", "Bluetooth enable")
-            listPairedBluetoothDevices()
-        }
-    }
-
     //receiver to detect if the bluetooth has been disabled
     private val bluetoothReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -86,7 +73,7 @@ class DiscoverActivity : AppCompatActivity() {
 
                 if (newState == BluetoothAdapter.STATE_OFF) {
                     Log.println(Log.INFO, "BluetoothService", "Bluetooth has been turned off ")
-                    checkBluetoothPermission()
+                    finish()
                 }
             }
         }
@@ -103,7 +90,7 @@ class DiscoverActivity : AppCompatActivity() {
             when (intent?.action) {
                 BluetoothDevice.ACTION_FOUND -> {
                     val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                    if (device != null) {
+                    if (device != null && device.name != null) {
                         bluetoothDevices.add(device)
                         Log.println(Log.INFO, "BluetoothDevices", String.format("   %s %s", device.name, device.address))
                     }
@@ -111,11 +98,11 @@ class DiscoverActivity : AppCompatActivity() {
                     val listView = findViewById<ListView>(R.id.listDevicesScaned)
                     listView.adapter = context?.let { MyAdapter(it, bluetoothDevices) }
 
-                    listView.setOnItemClickListener { adapterView, view, i, l ->
+                    listView.setOnItemClickListener { _, _, i, _ ->
                         val selectedElement = bluetoothDevices[i]
                         // Handle click on selected element
                         Log.println(Log.INFO, "BluetoothService", String.format("connection to %s %s",selectedElement.name, selectedElement.address))
-                        val connectThread = ConnectThread(selectedElement)
+                        val connectThread = ConnectThread(selectedElement, context as DiscoverActivity)
                         connectThread.start()
                     }
                 }
@@ -123,18 +110,22 @@ class DiscoverActivity : AppCompatActivity() {
         }
     }
 
-    @SuppressLint("MissingPermission")
-    private inner class ConnectThread(device: BluetoothDevice) : Thread() {
+    private inner class ConnectThread(device: BluetoothDevice, val activity: DiscoverActivity) : Thread() {
 
         private val mmSocket: BluetoothSocket? by lazy(LazyThreadSafetyMode.NONE) {
-            device.createRfcommSocketToServiceRecord(MY_UUID)
+            createBluetoothSocket(device)
         }
 
         override fun run() {
             Log.println(Log.INFO, "BluetoothService", "start connection")
+
+            if (ActivityCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                Log.println(Log.WARN, "BluetoothService","bluetooth connect permission not granted")
+                activity.finish()
+            }
             // Cancel discovery because it otherwise slows down the connection.
             bluetoothAdapter?.cancelDiscovery()
-
+            
             mmSocket?.let { socket ->
                 // Connect to the remote device through the socket. This call blocks
                 // until it succeeds or throws an exception.
@@ -148,14 +139,12 @@ class DiscoverActivity : AppCompatActivity() {
             }
         }
 
-        // Closes the client socket and causes the thread to finish.
-        fun cancel() {
-            try {
-                mmSocket?.close()
-                Log.println(Log.INFO, "BluetoothService", "can't connect to the client socket")
-            } catch (e: IOException) {
-                Log.println(Log.ERROR, "BluetoothService", "Could not close the client socket")
+        private fun createBluetoothSocket(device : BluetoothDevice): BluetoothSocket? {
+            if (ActivityCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                Log.println(Log.WARN, "BluetoothService","bluetooth connect permission not granted (2)")
+                activity.finish()
             }
+            return device.createRfcommSocketToServiceRecord(MY_UUID)
         }
     }
 
@@ -164,8 +153,6 @@ class DiscoverActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_discover)
-
-        Log.println(Log.INFO, "MainActivity","setup bluetooth register")
         registerReceiver(bluetoothReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 
         Log.println(Log.INFO, "BluetoothService","get Adapter")
@@ -178,7 +165,7 @@ class DiscoverActivity : AppCompatActivity() {
             finish()
         }
 
-        checkBluetoothPermission()
+        listPairedBluetoothDevices()
     }
 
 
@@ -195,15 +182,6 @@ class DiscoverActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         when (requestCode) {
-            REQUEST_BLUETOOTH_CONNECT -> {
-                if (grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                    Log.println(Log.WARN, "BluetoothService","bluetooth permission not granted. Couldn't connect to bluetooth device")
-                    finish()
-                } else {
-                    Log.println(Log.INFO, "BluetoothService","bluetooth permission granted")
-                    enableBluetooth()
-                }
-            }
             REQUEST_BLUETOOTH_SCAN -> {
                 if (grantResults[0] != PackageManager.PERMISSION_GRANTED) {
                     Log.println(Log.WARN, "BluetoothService","bluetooth permission not granted. Couldn't scan devices")
@@ -214,38 +192,6 @@ class DiscoverActivity : AppCompatActivity() {
                 }
             }
         }
-    }
-
-    //check if the bluetooth connect permission is allowed
-    fun checkBluetoothPermission() {
-        if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            Log.println(Log.INFO, "BluetoothService","ask for bluetooth permission")
-            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), REQUEST_BLUETOOTH_CONNECT)
-        } else {
-            Log.println(Log.INFO, "BluetoothService","bluetooth permission already allowed")
-            enableBluetooth()
-        }
-    }
-
-    //check if bluetooth is enable
-    private fun enableBluetooth() {
-        if (bluetoothAdapter?.isEnabled == false) {
-            Log.println(Log.INFO, "BluetoothService","bluetooth not enable")
-            requestEnableBluetooth()
-        } else {
-            Log.println(Log.INFO, "BluetoothService","bluetooth ready")
-            listPairedBluetoothDevices()
-        }
-    }
-
-    //ask to enable bluetooth
-    private fun requestEnableBluetooth() {
-        val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            Log.println(Log.WARN, "BluetoothService", "bluetooth permission not allowed")
-            finish()
-        }
-        bluetoothEnableLauncher.launch(enableBtIntent)
     }
 
     //list all known devices
