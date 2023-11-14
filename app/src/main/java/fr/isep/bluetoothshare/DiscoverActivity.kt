@@ -292,6 +292,7 @@ class DiscoverActivity : AppCompatActivity() {
     }
 
     private fun transfer(socket: BluetoothSocket) {
+        BluetoothSocketManager.setSocket(socket)
         val intent = Intent(this, TransferActivity::class.java)
         startActivity(intent)
     }
