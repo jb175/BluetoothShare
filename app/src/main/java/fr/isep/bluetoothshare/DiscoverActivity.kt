@@ -197,8 +197,8 @@ class DiscoverActivity : AppCompatActivity()  {
     //list all known devices
     private fun listPairedBluetoothDevices() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            finish()
             Log.println(Log.WARN, "BluetoothService", "Bluetooth permission is not allowed")
+            finish()
         }
 
         Log.println(Log.INFO, "BluetoothDevices", "already connected devices:")
@@ -241,5 +241,6 @@ class DiscoverActivity : AppCompatActivity()  {
         BluetoothSocketManager.setSocket(socket)
         val intent = Intent(this, TransferActivity::class.java)
         startActivity(intent)
+        finish()
     }
 }

@@ -20,7 +20,7 @@ class TransferActivity : AppCompatActivity() {
     private val handler: TransferHandler = TransferHandler()
     private val thread: TransferThread = TransferThread()
     private val messages = ArrayList<String>()
-    private val adapter: ArrayAdapter<String> = ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, messages)
+    private lateinit var adapter: ArrayAdapter<String>
 
     private inner class TransferThread : Thread() {
 
@@ -62,6 +62,7 @@ class TransferActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_transfer)
+        adapter = ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, messages)
         val listView = findViewById<ListView>(R.id.transferActivityMessages)
         listView.adapter = adapter
         thread.start()
@@ -69,6 +70,7 @@ class TransferActivity : AppCompatActivity() {
         button.setOnClickListener {
             val textView: TextView = findViewById(R.id.transferActivitySendMessage)
             val content = textView.text.toString()
+            textView.text = ""
             addMessage("[SENT] $content")
             thread.send("[RECEIVED] $content")
         }
